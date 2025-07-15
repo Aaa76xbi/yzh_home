@@ -1,0 +1,2228 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>仓库管理系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+  <!-- Tailwind 配置 - 未来感配色 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            secondary: '#0FC6C2',
+            accent: '#722ED1',
+            dark: '#1D2129',
+            light: '#F2F3F5'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'futuristic': '0 4px 20px rgba(22, 93, 255, 0.1)',
+            'hover': '0 8px 30px rgba(22, 93, 255, 0.15)',
+            'library': '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          }
+        },
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-gradient {
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+      }
+      .bg-glass {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+      }
+      .device-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .sidebar-item {
+        transition: all 0.3s ease;
+        transform-style: preserve-3d;
+        perspective: 1000px;
+      }
+      .sidebar-item:hover {
+        transform: translateZ(10px) translateY(-5px);
+        box-shadow: 0 15px 30px rgba(22, 93, 255, 0.15);
+      }
+      .sidebar-item::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(135deg, rgba(22, 93, 255, 0.1), transparent 50%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        transform: translateZ(-1px);
+      }
+      .sidebar-item:hover::before {
+        opacity: 1;
+      }
+      .sidebar-scroll-top {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 40px;
+        height: 40px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 50;
+      }
+      .sidebar-scroll-bottom {
+        position: fixed;
+        bottom: 80px; /* 从底部向上调整80px，避免挡住仓库信息 */
+        left: 20px;
+        width: 40px;
+        height: 40px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 50;
+      }
+      .sidebar-scroll-visible {
+        opacity: 1;
+      }
+
+      /* 为动态信息横幅添加嵌入式SVG背景图 */
+      #dynamicBanner, #entryDynamicBanner {
+        /* 将SVG作为数据URI直接嵌入，保证永不失效 */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'%3E%3Cg opacity='0.05' fill='%231D2129'%3E%3C!-- Person with clipboard --%3E%3Ccircle cx='130' cy='45' r='5'/%3E%3Cpath d='M125 52 h10 v30 h-10 z'/%3E%3Crect x='138' y='50' width='15' height='20' rx='2'/%3E%3Cpath d='M140 55 h9 M140 60 h9 M140 65 h7' stroke='%231D2129' stroke-width='1'/%3E%3C!-- Boxes on shelf --%3E%3Crect x='160' y='62' width='30' height='20' rx='2'/%3E%3Crect x='162' y='40' width='25' height='20' rx='2'/%3E%3Cpath d='M155 85 h40 M155 60 h40' stroke='%231D2129' stroke-width='1.5'/%3E%3C/g%3E%3C/svg%3E");
+        background-size: 150px; /* 控制背景图案的大小 */
+        background-repeat: no-repeat;
+        background-position: 95% 80%; /* 控制背景图案的位置 (右下角) */
+      }
+
+      /* 流光扫描动画 */
+      #dynamicBanner::after, #entryDynamicBanner::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        /* 将流光动画的背景从白色半透明改为深色半透明，以增强质感 */
+        background: linear-gradient(90deg, transparent, rgba(29, 33, 41, 0.1), transparent);
+        animation: scanner-animation 4s linear infinite;
+        pointer-events: none;
+      }
+
+      @keyframes scanner-animation {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      /* 动态文本轮播动画 */
+      .dynamic-text-item {
+        animation: slide-up-fade-in 4s ease-in-out;
+      }
+
+      @keyframes slide-up-fade-in {
+        0% {
+          opacity: 0;
+          transform: translateY(100%);
+        }
+        20%, 80% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-100%);
+        }
+      }
+
+      /* 导航链接动画 */
+      .nav-link {
+        position: relative;
+        padding-bottom: 8px; /* 为下划线动画提供空间 */
+      }
+      .nav-link::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: -1px; /* 微调位置，使其紧贴文字下方 */
+        width: 100%;
+        height: 2px;
+        background-color: #165DFF; /* primary color */
+        transform: scaleX(0);
+        transform-origin: bottom right;
+        transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      .nav-link:hover::after,
+      .nav-link.active::after {
+        transform: scaleX(1);
+        transform-origin: bottom left;
+      }
+
+      /* 新入库记录呼吸动画 */
+      @keyframes breathe-animation {
+        0%   { background-color: rgba(22, 93, 255, 0.15); box-shadow: 0 0 8px rgba(22, 93, 255, 0.2); }
+        50%  { background-color: rgba(22, 93, 255, 0.03); box-shadow: 0 0 20px rgba(22, 93, 255, 0.1); }
+        100% { background-color: rgba(22, 93, 255, 0.15); box-shadow: 0 0 8px rgba(22, 93, 255, 0.2); }
+      }
+      .breathing-row {
+        animation: breathe-animation 2.5s ease-in-out infinite;
+      }
+    }
+  </style>
+
+  <!-- 打印专用样式 (已添加) -->
+  <style>
+    @media print {
+      /* 隐藏所有不需要打印的元素 */
+      body > .flex > aside,
+      main > header,
+      body > .fixed,
+      #statusAlert,
+      #deviceManagement,
+      #exitRecord,
+      #statistics,
+      .sidebar-scroll-top,
+      .sidebar-scroll-bottom,
+      #entryDynamicBanner,
+      #entryRecord .p-5.border-b,
+      #entryRecord .px-6.py-4.border-t,
+      #addDeviceModalContainer,
+      #editDeviceModal,
+      #confirmExitModal,
+      #deviceListModal {
+        display: none !important;
+      }
+
+      /* 确保主内容区域和表格充满页面 */
+      body, main, .tab-content, #entryRecord, #entryTableContent {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: #fff !important;
+      }
+
+      #entryTableContent .overflow-x-auto {
+        overflow: visible !important;
+      }
+
+      /* 专业的表格打印样式 */
+      h2, h3, p {
+        color: #000 !important;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      th, td {
+        border: 1px solid #ccc !important;
+        padding: 8px !important;
+        color: #000 !important;
+      }
+
+      thead {
+        background-color: #f2f2f2 !important;
+      }
+
+      tr {
+        page-break-inside: avoid;
+      }
+
+      /* 打印时取消呼吸动画 */
+      .breathing-row {
+        animation: none !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<!-- 修改：为body添加h-screen和overflow-hidden，并移除min-h-screen -->
+<body class="bg-gray-50 text-dark overflow-x-hidden h-screen overflow-hidden">
+<div class="flex h-full">
+  <aside class="w-64 bg-white border-r border-gray-200 shadow-sm flex flex-col h-full" id="sidebar">
+    <div class="p-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+        <i class="fa fa-th-large text-primary mr-2"></i>仓库列表
+      </h2>
+    </div>
+
+    <div class="p-4 overflow-y-auto flex-1">
+      <button id="addLibraryBtn" class="w-full bg-primary/10 hover:bg-primary/20 text-primary rounded-lg px-4 py-2 text-sm flex items-center justify-center transition-colors mb-4">
+        <i class="fa fa-plus mr-2"></i> 添加新仓库
+      </button>
+
+      <div class="space-y-3" id="librariesList">
+        <!-- 仓库列表项将通过JavaScript动态生成 -->
+      </div>
+    </div>
+
+    <div class="p-4 border-t border-gray-200 bg-white">
+      <div class="text-xs text-gray-500">
+        <p>当前仓库: <span id="currentLibraryName" class="font-medium text-primary">总仓库</span></p>
+        <p class="mt-1">设备总数: <span id="currentLibraryCount" class="font-medium">14</span></p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主内容区域 -->
+  <main class="flex-1 flex flex-col h-screen">
+    <!-- 吸顶导航栏 -->
+    <header class="sticky top-0 z-30 bg-glass border-b border-gray-200 transition-all duration-300">
+      <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16 md:h-20">
+          <!-- 标题区域 -->
+          <div class="flex items-center">
+            <div class="bg-primary/10 p-2 rounded-lg mr-3">
+              <i class="fa fa-cube text-primary text-xl"></i>
+            </div>
+            <div>
+              <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-primary to-accent text-gradient">
+                仓库管理系统
+              </h1>
+              <p class="text-xs text-gray-500 hidden md:block">智能设备全生命周期管理</p>
+            </div>
+          </div>
+
+          <!-- 导航菜单 -->
+          <nav class="hidden md:block">
+            <ul class="flex space-x-1" id="navTabs">
+              <li>
+                <a href="#" class="nav-link px-4 py-2 text-sm font-medium text-gray-500 hover:text-primary transition-colors" data-target="statistics">
+                  <i class="fa fa-bar-chart mr-1"></i>统计报表
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link px-4 py-2 text-sm font-medium text-gray-500 hover:text-primary transition-colors" data-target="deviceManagement">
+                  <i class="fa fa-cubes mr-1"></i>设备管理
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link px-4 py-2 text-sm font-medium text-gray-500 hover:text-primary transition-colors" data-target="entryRecord">
+                  <i class="fa fa-sign-in mr-1"></i>入库记录
+                </a>
+              </li>
+              <li>
+                <a href="#" class="nav-link px-4 py-2 text-sm font-medium text-gray-500 hover:text-primary transition-colors" data-target="exitRecord">
+                  <i class="fa fa-sign-out mr-1"></i>出库记录
+                </a>
+              </li>
+            </ul>
+          </nav>
+
+          <!-- 移动端菜单按钮 -->
+          <button class="md:hidden text-gray-700" id="mobileMenuBtn">
+            <i class="fa fa-bars text-xl"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 移动端导航菜单 -->
+      <div class="md:hidden hidden bg-white border-t border-gray-100" id="mobileMenu">
+        <div class="container mx-auto px-4 py-2">
+          <ul class="py-2" id="mobileNavTabs">
+            <li>
+              <a href="#" class="block px-4 py-2 text-sm font-medium text-primary" data-target="statistics">
+                <i class="fa fa-bar-chart mr-1"></i>统计报表
+              </a>
+            </li>
+            <li>
+              <a href="#" class="block px-4 py-2 text-sm font-medium text-gray-500" data-target="deviceManagement">
+                <i class="fa fa-cubes mr-1"></i>设备管理
+              </a>
+            </li>
+            <li>
+              <a href="#" class="block px-4 py-2 text-sm font-medium text-gray-500" data-target="entryRecord">
+                <i class="fa fa-sign-in mr-1"></i>入库记录
+              </a>
+            </li>
+            <li>
+              <a href="#" class="block px-4 py-2 text-sm font-medium text-gray-500" data-target="exitRecord">
+                <i class="fa fa-sign-out mr-1"></i>出库记录
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <!-- 页面容器 -->
+    <div class="px-4 py-6 overflow-y-auto flex-1">
+      <!-- 状态提示 -->
+      <div id="statusAlert" class="hidden bg-primary/10 border border-primary/20 text-primary px-4 py-3 rounded-lg mb-6 flex items-center animate-fadeIn">
+        <i class="fa fa-info-circle mr-3 text-primary"></i>
+        <span id="alertMessage"></span>
+        <button type="button" class="ml-auto text-primary hover:text-primary/80 transition-colors">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+
+      <!-- 选项卡内容区域 -->
+      <div class="tab-content">
+        <!-- 设备管理区域 -->
+        <div id="deviceManagement" class="tab-pane">
+          <!-- 动态信息横幅 -->
+          <div id="dynamicBanner" class="bg-white rounded-xl p-5 shadow-futuristic border border-gray-100 mb-6 flex items-center justify-between relative overflow-hidden">
+            <!-- 左侧：总设备数 -->
+            <div class="flex items-center">
+              <div class="bg-primary/10 p-4 rounded-lg mr-4">
+                <i class="fa fa-hdd-o text-primary text-3xl"></i>
+              </div>
+              <div>
+                <p class="text-gray-500 text-sm">设备总数</p>
+                <h3 class="text-3xl font-bold text-gray-800 mt-1" id="bannerTotalDevices">0</h3>
+              </div>
+            </div>
+
+            <!-- 分隔线 -->
+            <div class="w-px h-12 bg-gray-200 mx-6 hidden lg:block"></div>
+
+            <!-- 右侧：动态信息轮播 -->
+            <div class="flex-1 text-right pr-4">
+              <div id="dynamicTextContainer" class="h-10 flex items-center justify-end text-gray-600 text-sm">
+                <!-- 动态文本将通过JS生成在这里 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 表格区域 -->
+          <div class="bg-white rounded-xl shadow-futuristic border border-gray-100 overflow-hidden mb-6">
+            <!-- 工具栏 -->
+            <div class="p-5 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-800">设备库存列表</h2>
+                <p class="text-sm text-gray-500">管理所有设备的库存状态和基本信息</p>
+              </div>
+
+              <div class="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                <div class="relative flex-grow md:flex-grow-0 md:w-64">
+                  <input type="text" id="deviceSearchInput" placeholder="搜索设备名称..."
+                         class="w-full px-4 py-2 border border-gray-200 rounded-lg ... " />
+                  <i id="deviceSearchIcon" class="fa fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer hover:text-primary"></i>
+                </div>
+
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                  <div class="relative">
+                    <select id="pageSizeSelector" class="appearance-none w-full md:w-32 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm bg-white pr-8">
+                      <option value="5">5条/页</option>
+                      <option value="10" selected>10条/页</option>
+                      <option value="20">20条/页</option>
+                      <option value="50">50条/页</option>
+                    </select>
+                    <i class="fa fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                  </div>
+
+                  <button id="addDeviceBtn" class="bg-primary text-white rounded-lg px-4 py-2 text-sm flex items-center transition-all duration-300 hover:bg-primary/90 hover:shadow-lg">
+                    <i class="fa fa-plus mr-1"></i> 添加设备
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div id="deviceLoadingState" class="py-20 flex flex-col items-center justify-center">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p class="mt-4 text-gray-500">正在加载设备数据...</p>
+            </div>
+
+            <!-- 空数据状态 -->
+            <div id="deviceEmptyState" class="hidden py-20 flex flex-col items-center justify-center">
+              <i class="fa fa-box-open text-4xl text-gray-300 mb-4"></i>
+              <h3 class="text-lg font-medium text-gray-800">暂无设备数据</h3>
+              <p class="mt-2 text-gray-500">点击"添加设备"按钮创建第一条记录</p>
+            </div>
+
+            <!-- 表格内容 -->
+            <div id="deviceTableContent" class="hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                  <tr class="bg-gray-50">
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备名称</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备编号</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">入库时间</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">库存数量</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200" id="devicesTableBody">
+                  <!-- 设备数据行 - 动态生成 -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- 分页控制 -->
+              <div class="px-6 py-4 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center">
+                <div class="text-sm text-gray-500 mb-4 md:mb-0">
+                  显示 <span id="deviceStartIndex">1</span> 到 <span id="deviceEndIndex">0</span> 条，共 <span id="deviceTotalCount">0</span> 条
+                </div>
+
+                <div class="flex items-center">
+                  <button id="devicePrevPage" class="px-3 py-1.5 rounded-l-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>
+                    <i class="fa fa-chevron-left text-xs"></i>
+                  </button>
+
+                  <div id="devicePaginationNumbers" class="flex">
+                    <!-- 页码将通过JavaScript动态填充 -->
+                  </div>
+
+                  <button id="deviceNextPage" class="px-3 py-1.5 rounded-r-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>
+                    <i class="fa fa-chevron-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 入库记录区域 -->
+        <div id="entryRecord" class="tab-pane hidden">
+          <!-- BANNER -->
+          <div id="entryDynamicBanner" class="bg-white rounded-xl p-5 shadow-futuristic border border-gray-100 mb-6 flex items-center justify-between relative overflow-hidden">
+            <div class="flex items-center">
+              <div class="bg-primary/10 p-4 rounded-lg mr-4">
+                <i class="fa fa-archive text-primary text-3xl"></i>
+              </div>
+              <div>
+                <p class="text-gray-500 text-sm">设备入库总数</p>
+                <h3 class="text-3xl font-bold text-gray-800 mt-1" id="bannerTotalEntries">0</h3>
+              </div>
+            </div>
+            <div class="w-px h-12 bg-gray-200 mx-6 hidden lg:block"></div>
+            <div class="flex-1 text-right pr-4">
+              <div id="entryDynamicTextContainer" class="h-10 flex items-center justify-end text-gray-600 text-sm">
+                <i class="fa fa-check-circle text-secondary mr-3 text-lg"></i>
+                <span>今日暂无新入库记录</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 入库记录列表 (LIST WITH INTEGRATED SEARCH IN HEADER) -->
+          <div class="bg-white rounded-xl shadow-futuristic border border-gray-100 overflow-hidden mb-6">
+            <div class="p-5 border-b border-gray-100">
+              <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 class="text-lg font-semibold text-gray-800">入库记录列表</h2>
+                  <p class="text-sm text-gray-500">查看所有设备的入库历史记录</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 w-full lg:w-auto mt-4 md:mt-0">
+                  <input type="text" id="entryDeviceNameInput" placeholder="设备名称" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" />
+                  <input type="date" id="entryStartDateInput" placeholder="开始日期" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" />
+                  <input type="date" id="entryEndDateInput" placeholder="结束日期" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" />
+                  <div class="flex gap-3">
+                    <button id="entryResetBtn" class="flex-1 bg-gray-100 text-gray-700 rounded-lg px-4 py-2 text-sm transition-colors hover:bg-gray-200">
+                      <i class="fa fa-refresh mr-1"></i> 重置
+                    </button>
+                    <button id="entrySearchBtn" class="flex-1 bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90">
+                      <i class="fa fa-search mr-1"></i> 搜索
+                    </button>
+                    <!-- 打印按钮 -->
+                    <button id="printEntryRecordsBtn" class="bg-secondary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-secondary/90">
+                      <i class="fa fa-print mr-1"></i> 打印
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 表格内容 -->
+            <div id="entryTableContent" class="hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                  <tr class="bg-gray-50">
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备名称</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">入库时间</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">入库数量</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作人</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">备注</th>
+                  </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200" id="entryRecordsTableBody">
+                  <!-- 入库记录行 - 动态生成 -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- 分页控制 -->
+              <div class="px-6 py-4 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center">
+                <div class="text-sm text-gray-500 mb-4 md:mb-0">
+                  显示 <span id="entryStartIndex">1</span> 到 <span id="entryEndIndex">0</span> 条，共 <span id="entryTotalCount">0</span> 条
+                </div>
+
+                <div class="flex items-center">
+                  <button id="entryPrevPage" class="px-3 py-1.5 rounded-l-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>
+                    <i class="fa fa-chevron-left text-xs"></i>
+                  </button>
+
+                  <div id="entryPaginationNumbers" class="flex">
+                    <!-- 页码将通过JavaScript动态填充 -->
+                  </div>
+
+                  <button id="entryNextPage" class="px-3 py-1.5 rounded-r-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>
+                    <i class="fa fa-chevron-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 出库记录区域 -->
+        <div id="exitRecord" class="tab-pane hidden">
+          <div class="mb-4 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800">出库记录</h3>
+            <button class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90" id="addExitRecordBtn">
+              <i class="fa fa-plus mr-1"></i> 添加出库记录
+            </button>
+          </div>
+
+          <!-- 搜索表单 -->
+          <div class="bg-white p-4 rounded-lg shadow-sm mb-4">
+            <div class="flex flex-col md:flex-row gap-4">
+              <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">设备名称</label>
+                <input type="text" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" placeholder="请输入设备名称">
+              </div>
+              <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">操作人</label>
+                <input type="text" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" placeholder="请输入操作人">
+              </div>
+              <div class="flex items-end">
+                <button class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90 w-full md:w-auto">
+                  <i class="fa fa-search mr-1"></i> 搜索
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 加载状态 -->
+          <div class="hidden" id="exitLoadingState">
+            <div class="flex flex-col items-center justify-center py-12 bg-white rounded-lg shadow-sm">
+              <div class="w-12 h-12 border-4 border-gray-200 border-t-primary rounded-full animate-spin mb-4"></div>
+              <p class="text-gray-500">加载中...</p>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div class="hidden" id="exitEmptyState">
+            <div class="flex flex-col items-center justify-center py-12 bg-white rounded-lg shadow-sm">
+              <div class="w-16 h-16 flex items-center justify-center bg-gray-100 rounded-full mb-4">
+                <i class="fa fa-file-text-o text-gray-400 text-2xl"></i>
+              </div>
+              <p class="text-gray-500 mb-2">暂无出库记录</p>
+              <button class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90">
+                <i class="fa fa-plus mr-1"></i> 添加出库记录
+              </button>
+            </div>
+          </div>
+
+          <!-- 表格内容 -->
+          <div class="hidden" id="exitTableContent">
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备名称</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">出库时间</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">出库数量</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作人</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">领取人</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用途</th>
+                </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="exitRecordsTableBody"></tbody>
+              </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="flex flex-col md:flex-row justify-between items-center mt-4 bg-white p-3 rounded-lg shadow-sm">
+              <div class="text-sm text-gray-500 mb-2 md:mb-0">
+                显示 <span id="exitStartIndex">0</span> 到 <span id="exitEndIndex">0</span> 条，共 <span id="exitTotalCount">0</span> 条记录
+              </div>
+              <div class="flex items-center gap-2">
+                <button class="px-3 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-gray-500 hover:text-primary disabled:opacity-50 disabled:hover:text-gray-500" id="exitPrevPage" disabled>
+                  上一页
+                </button>
+                <div class="flex" id="exitPaginationNumbers"></div>
+                <button class="px-3 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-gray-500 hover:text-primary disabled:opacity-50 disabled:hover:text-gray-500" id="exitNextPage" disabled>
+                  下一页
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 统计报表区域 -->
+        <div id="statistics" class="tab-pane hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- 库存统计图表 -->
+            <div class="bg-white rounded-xl shadow-futuristic border border-gray-100 p-5 transition-all duration-300 hover:shadow-hover">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">设备库存统计</h3>
+              <div class="h-80">
+                <canvas id="inventoryChart"></canvas>
+              </div>
+            </div>
+
+            <!-- 出入库趋势图表 -->
+            <div class="bg-white rounded-xl shadow-futuristic border border-gray-100 p-5 transition-all duration-300 hover:shadow-hover">
+              <h3 class="text-lg font-semibold text-gray-800 mb-4">出入库趋势</h3>
+              <div class="h-80">
+                <canvas id="trendChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- 设备状态分布 -->
+          <div class="bg-white rounded-xl shadow-futuristic border border-gray-100 p-5 mb-6 transition-all duration-300 hover:shadow-hover">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">设备状态分布</h3>
+            <div class="h-80">
+              <canvas id="statusChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 添加仓库模态框 -->
+<div class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" id="addLibraryModal">
+  <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+    <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="text-lg font-semibold text-gray-800">添加新仓库</h3>
+      <button type="button" class="text-gray-500 hover:text-gray-700 transition-colors" id="closeLibraryModal">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="p-5">
+      <form id="addLibraryForm">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">仓库名称 <span class="text-red-500">*</span></label>
+          <input type="text" id="libraryName" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" required>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">仓库位置</label>
+          <input type="text" id="libraryLocation" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">负责人</label>
+          <input type="text" id="libraryManager" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+          <textarea id="libraryRemark" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" rows="3"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3">
+      <button type="button" class="bg-gray-100 text-gray-700 rounded-lg px-4 py-2 text-sm transition-colors hover:bg-gray-200" id="cancelLibraryModal">取消</button>
+      <button type="button" class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90" id="submitLibrary">创建仓库</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设备列表模态框 (最终修正版) -->
+<div class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" id="deviceListModal">
+  <div class="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-95 opacity-0" id="deviceListModalContent">
+    <!-- 头部 -->
+    <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="text-lg font-semibold text-gray-800">选择设备</h3>
+      <button type="button" class="text-gray-500 hover:text-gray-700 transition-colors" id="closeDeviceListModal">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="p-5 flex-1 overflow-y-auto">
+      <!-- 搜索框 -->
+      <div class="mb-4 relative">
+        <input type="text" id="deviceSearchInputInModal" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" placeholder="搜索设备名称，按回车键确认...">
+        <i class="fa fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+      </div>
+
+      <!-- 加载状态 -->
+      <div class="hidden" id="deviceListLoadingStateInModal">
+        <div class="flex flex-col items-center justify-center py-12">
+          <div class="w-12 h-12 border-4 border-gray-200 border-t-primary rounded-full animate-spin mb-4"></div>
+          <p class="text-gray-500">加载中...</p>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div class="hidden" id="deviceListEmptyStateInModal">
+        <div class="flex flex-col items-center justify-center py-12">
+          <div class="w-16 h-16 flex items-center justify-center bg-gray-100 rounded-full mb-4">
+            <i class="fa fa-cubes text-gray-400 text-2xl"></i>
+          </div>
+          <p class="text-gray-500 mb-2">暂无设备数据</p>
+        </div>
+      </div>
+
+      <!-- 设备列表 -->
+      <div class="hidden" id="deviceListContentInModal">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备名称</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备编号</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">入库时间</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">库存数量</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <!-- 使用了新的唯一ID: modalDeviceListTableBody -->
+            <tbody class="bg-white divide-y divide-gray-200" id="modalDeviceListTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分页 (从表格区域移到模态框底部，确保可见) -->
+    <div class="p-3 border-t border-gray-100 flex-shrink-0">
+         <div class="flex flex-col md:flex-row justify-between items-center bg-white">
+            <div class="text-sm text-gray-500 mb-2 md:mb-0">
+              <!-- 使用了新的唯一ID -->
+              显示 <span id="modalDeviceListStartIndex">0</span> 到 <span id="modalDeviceListEndIndex">0</span> 条，共 <span id="modalDeviceListTotalCount">0</span> 条记录
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-gray-500 hover:text-primary disabled:opacity-50" id="modalDeviceListPrevPage" disabled>
+                上一页
+              </button>
+              <div class="flex" id="modalDeviceListPaginationNumbers"></div>
+              <button class="px-3 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-gray-500 hover:text-primary disabled:opacity-50" id="modalDeviceListNextPage" disabled>
+                下一页
+              </button>
+            </div>
+          </div>
+    </div>
+  </div>
+</div>
+
+<!-- 确认出库模态框 -->
+<div class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" id="confirmExitModal">
+  <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0" id="confirmExitModalContent">
+    <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="text-lg font-semibold text-gray-800">确认出库</h3>
+      <button type="button" class="text-gray-500 hover:text-gray-700 transition-colors" id="closeConfirmExitModal">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="p-5">
+      <input type="hidden" id="confirmDeviceId">
+      <div class="mb-4">
+        <p class="text-gray-700" id="confirmDeviceInfo"></p>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">出库数量</label>
+        <input type="number" id="exitQuantity" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" min="1" value="1">
+      </div>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3">
+      <button type="button" class="bg-gray-100 text-gray-700 rounded-lg px-4 py-2 text-sm transition-colors hover:bg-gray-200" id="cancelConfirmExitModal">取消</button>
+      <button type="button" class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90" id="confirmExitSubmit">确认出库</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑设备模态框 -->
+<div class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" id="editDeviceModal">
+  <div class="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0" id="editModalContent">
+    <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="text-lg font-semibold text-gray-800">编辑设备信息</h3>
+      <button type="button" class="text-gray-500 hover:text-gray-700 transition-colors" id="closeEditModal">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="p-5">
+      <form id="editDeviceForm">
+        <input type="hidden" id="editDeviceId">
+        <input type="hidden" id="editProductUnm">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">设备名称 <span class="text-red-500">*</span></label>
+          <input type="text" id="editDeviceName" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm" required>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">设备编号</label>
+          <input type="text" id="editDeviceIdentifier" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">入库时间</label>
+          <input type="datetime-local" id="editDeviceEntryTime" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">库存数量</label>
+          <input type="text" id="editDeviceInventory" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm bg-gray-100" readonly>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+          <input type="text" id="editDeviceStatus" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all text-sm bg-gray-100" readonly>
+        </div>
+      </form>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3">
+      <button type="button" class="bg-gray-100 text-gray-700 rounded-lg px-4 py-2 text-sm transition-colors hover:bg-gray-200" id="cancelEditModal">取消</button>
+      <button type="button" class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90" id="submitEditDevice">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加设备模态框 -->
+<div class="fixed inset-0 bg-black bg-opacity-0 hidden items-center justify-center z-50 transition-opacity duration-300" id="addDeviceModalContainer">
+  <div class="bg-white rounded-xl w-full max-w-md shadow-2xl transform-gpu transition-all duration-300 scale-0 opacity-0" id="addDeviceModalContent" style="transform-origin: var(--tw-origin-x) var(--tw-origin-y);">
+    <!-- 弹窗头部 -->
+    <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+      <h3 class="text-lg font-semibold text-gray-800">添加新设备</h3>
+      <button type="button" class="text-gray-500 hover:text-gray-700 transition-colors" id="closeAddDeviceModal">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <!-- 弹窗内容 -->
+    <div class="p-5">
+      <form id="addDeviceForm">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">设备名称 <span class="text-red-500">*</span></label>
+          <input type="text" id="newDeviceName" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary" required>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">设备编号 <span class="text-red-500">*</span></label>
+          <input type="text" id="newDeviceId" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary" required>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">入库时间</label>
+          <input type="datetime-local" id="newDeviceEntryTime" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+          <textarea id="newDeviceParticulars" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary" rows="3"></textarea>
+        </div>
+      </form>
+    </div>
+    <!-- 弹窗底部 -->
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3">
+      <button type="button" class="bg-gray-100 text-gray-700 rounded-lg px-4 py-2 text-sm transition-colors hover:bg-gray-200" id="cancelAddDeviceModal">取消</button>
+      <button type="button" class="bg-primary text-white rounded-lg px-4 py-2 text-sm transition-colors hover:bg-primary/90" id="submitAddDevice">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================================
+  // 1. 全局变量定义
+  // ==========================================================
+  let librariesData = [];
+  const deviceIcons = {
+    '血压仪': 'fa-heartbeat',
+    '血糖仪': 'fa-flask',
+    '尿酸仪': 'fa-tint',
+    '人体存在检测': 'fa-user',
+    '水滴形监控': 'fa-video-camera',
+    '智能门阀': 'fa-lock',
+    '通话报警': 'fa-phone',
+    '红外探测仪': 'fa-bullseye',
+    '燃气泄漏检测': 'fa-fire',
+    '智能手表': 'fa-clock-o',
+    '挂式呼叫器': 'fa-bell',
+    '救助记录仪': 'fa-ambulance',
+    '浸水检测': 'fa-tint',
+    '生命体征探测器': 'fa-heartbeat'
+  };
+  let currentLibraryId = 1;
+  const API_BASE_URL = 'http://192.168.1.93:5001';
+
+
+  // ==========================================================
+  // 2. 通用工具函数
+  // ==========================================================
+  function showAlert(message) {
+    const alert = document.getElementById('statusAlert');
+    const alertMessage = document.getElementById('alertMessage');
+
+    alertMessage.textContent = message;
+    alert.classList.remove('hidden');
+
+    // 3秒后自动隐藏
+    setTimeout(() => {
+      alert.classList.add('hidden');
+    }, 3000);
+  }
+
+  function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return 'N/A';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+
+  // ==========================================================
+  // 3. 核心功能函数
+  // ==========================================================
+
+  // 初始化侧边栏滚动效果
+  function initSidebarScroll() {
+    const scrollTopBtn = document.createElement('div');
+    scrollTopBtn.className = 'sidebar-scroll-top';
+    scrollTopBtn.innerHTML = '<i class="fa fa-chevron-up text-primary"></i>';
+    document.body.appendChild(scrollTopBtn);
+
+    const scrollBottomBtn = document.createElement('div');
+    scrollBottomBtn.className = 'sidebar-scroll-bottom';
+    scrollBottomBtn.innerHTML = '<i class="fa fa-chevron-down text-primary"></i>';
+    document.body.appendChild(scrollBottomBtn);
+
+    const sidebar = document.getElementById('sidebar');
+
+    sidebar.addEventListener('scroll', function() {
+      if (sidebar.scrollTop > 100) {
+        scrollTopBtn.classList.add('sidebar-scroll-visible');
+      } else {
+        scrollTopBtn.classList.remove('sidebar-scroll-visible');
+      }
+
+      if (sidebar.scrollHeight - sidebar.scrollTop - sidebar.clientHeight > 100) {
+        scrollBottomBtn.classList.add('sidebar-scroll-visible');
+      } else {
+        scrollBottomBtn.classList.remove('sidebar-scroll-visible');
+      }
+    });
+
+    scrollTopBtn.addEventListener('click', () => sidebar.scrollTo({ top: 0, behavior: 'smooth' }));
+    scrollBottomBtn.addEventListener('click', () => sidebar.scrollTo({ top: sidebar.scrollHeight, behavior: 'smooth' }));
+  }
+
+  // 加载所有仓库数据
+  function loadLibrariesData() {
+    showAlert('正在加载仓库数据...');
+    fetch(`${API_BASE_URL}/api/table_count?dbname=yzh_kucun_name`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          librariesData = [];
+          data.data.tables_info.forEach(table => {
+            const sample = table.data_sample[0] || {};
+            librariesData.push({
+              id: librariesData.length + 1,
+              name: sample.name || '未指定',
+              location: sample.weizhi || '未指定',
+              manager: sample.manager || '未指定',
+              deviceCount: table.device_count,
+              tableName: table.related_devices_table,
+              chukuTableName: table.related_chuku_table
+            });
+          });
+
+          renderLibrariesList();
+
+          if (librariesData.length > 0) {
+            currentLibraryId = librariesData[0].id;
+            loadLibraryDevices(currentLibraryId);
+
+            const currentLibrary = librariesData[0];
+            document.getElementById('currentLibraryName').textContent = currentLibrary.name;
+            document.getElementById('currentLibraryCount').textContent = currentLibrary.deviceCount;
+          }
+          showAlert('仓库数据加载成功');
+        } else {
+          showAlert('获取仓库数据失败: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        showAlert('获取仓库数据时发生错误');
+      });
+  }
+
+  // 初始化出库相关功能 (最终修正版)
+  function initAddExitRecord() {
+    document.getElementById('addExitRecordBtn')?.addEventListener('click', () => {
+      const searchInput = document.getElementById('deviceSearchInputInModal');
+      if (searchInput) searchInput.value = '';
+      showDeviceListModal();
+      loadDevicesForExit();
+    });
+
+    document.getElementById('closeDeviceListModal')?.addEventListener('click', hideDeviceListModal);
+    document.getElementById('closeConfirmExitModal')?.addEventListener('click', hideConfirmExitModal);
+    document.getElementById('cancelConfirmExitModal')?.addEventListener('click', hideConfirmExitModal);
+    document.getElementById('confirmExitSubmit')?.addEventListener('click', processExitRecord);
+
+    const searchInputInModal = document.getElementById('deviceSearchInputInModal');
+    if (searchInputInModal) {
+      searchInputInModal.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          loadDevicesForExit(searchInputInModal.value.trim());
+        }
+      });
+    }
+  }
+  // 显示/隐藏出库设备选择模态框
+  function showDeviceListModal() {
+    const modal = document.getElementById('deviceListModal');
+    const modalContent = document.getElementById('deviceListModalContent');
+    if (modal && modalContent) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+  }
+
+  function hideDeviceListModal() {
+    const modal = document.getElementById('deviceListModal');
+    const modalContent = document.getElementById('deviceListModalContent');
+    if (modal && modalContent) {
+      modalContent.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+  }
+
+  // 显示/隐藏确认出库模态框
+  function showConfirmExitModal(deviceId, deviceName, inventory) {
+    document.getElementById('confirmDeviceId').value = deviceId;
+    document.getElementById('confirmDeviceInfo').textContent = `您确定要出库设备：${deviceName}（库存：${inventory}）吗？`;
+    document.getElementById('exitQuantity').value = 1;
+    const modal = document.getElementById('confirmExitModal');
+    const modalContent = document.getElementById('confirmExitModalContent');
+    if (modal && modalContent) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+  }
+
+  function hideConfirmExitModal() {
+    const modal = document.getElementById('confirmExitModal');
+    const modalContent = document.getElementById('confirmExitModalContent');
+    if (modal && modalContent) {
+      modalContent.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+  }
+
+  // 加载设备数据用于出库选择 (最终修正版)
+  function loadDevicesForExit(searchTerm = '') {
+    const modalContent = document.getElementById('deviceListContentInModal');
+    const loadingState = document.getElementById('deviceListLoadingStateInModal');
+    const emptyState = document.getElementById('deviceListEmptyStateInModal');
+
+    if (!modalContent || !loadingState || !emptyState) {
+      console.error("无法找到出库模态框所需的核心元素。");
+      return;
+    }
+
+    modalContent.classList.add('hidden');
+    loadingState.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+
+    const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+    if (!currentLibrary || !currentLibrary.tableName) {
+      showAlert('仓库表名无效，无法加载设备列表');
+      loadingState.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    let apiUrl = searchTerm ?
+      `${API_BASE_URL}/api/search_devices?table_name=${currentLibrary.tableName}&devices_name=${encodeURIComponent(searchTerm)}` :
+      `${API_BASE_URL}/api/devices?dbname=yzh_repertory01&table_name=${currentLibrary.tableName}`;
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        loadingState.classList.add('hidden');
+        if (data.success) {
+          const nameToCountMap = new Map();
+          const counts = data.device_name_counts || (searchTerm && [[data.devices_name, data.device_count]]) || [];
+          counts.forEach(item => {
+            const name = Array.isArray(item) ? item[0] : item.devices_name;
+            const count = Array.isArray(item) ? item[1] : item.count;
+            nameToCountMap.set(name, count || 0);
+          });
+
+          const devices = (data.devices || data.data || []).map(device => {
+            const totalCount = nameToCountMap.get(device.devices_name) || 0;
+            return {
+              id: device.id,
+              name: device.devices_name,
+              deviceId: device.device_id,
+              entryTime: device.warehouse_entry_time,
+              totalCount: totalCount,
+              calculatedStatus: totalCount > 6 ? '充盈' : (totalCount >= 3 ? '饱和' : '紧张')
+            };
+          });
+
+          renderDevicesListForExit(devices);
+
+          if (devices.length === 0) {
+            emptyState.classList.remove('hidden');
+          } else {
+            modalContent.classList.remove('hidden');
+          }
+        } else {
+          showAlert('获取设备数据失败: ' + data.message);
+          emptyState.classList.remove('hidden');
+        }
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        showAlert('获取设备数据时发生错误: ' + error.message);
+        loadingState.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+      });
+  }
+  // 渲染用于出库选择的设备列表 (最终修正版)
+  function renderDevicesListForExit(devices) {
+    // 使用新的、唯一的ID
+    const tableBody = document.getElementById('modalDeviceListTableBody');
+
+    if (!tableBody) {
+      console.error("在 'renderDevicesListForExit' 函数中无法找到ID为 'modalDeviceListTableBody' 的元素！");
+      return;
+    }
+
+    tableBody.innerHTML = '';
+    if (!devices || devices.length === 0) return;
+
+    const statusStyles = {
+      '充盈': 'bg-blue-100 text-blue-800',
+      '饱和': 'bg-yellow-100 text-yellow-800',
+      '紧张': 'bg-red-100 text-red-800'
+    };
+
+    devices.forEach((device, index) => {
+      const iconClass = deviceIcons[device.name] || 'fa-cube';
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-gray-50 transition-colors duration-200';
+      row.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+        <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center"><div class="device-icon bg-primary/10 rounded-full text-primary mr-3"><i class="fa ${iconClass}"></i></div><div class="text-sm font-medium text-gray-900">${device.name}</div></div></td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${device.deviceId || 'N/A'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDateTime(device.entryTime)}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${device.totalCount}</td>
+        <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[device.calculatedStatus] || 'bg-gray-100 text-gray-800'}">${device.calculatedStatus}</span></td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium"><button class="text-primary hover:text-primary/80 transition-colors exit-device-btn" data-id="${device.id}" data-name="${device.name}" data-inventory="${device.totalCount}">出库</button></td>
+      `;
+      tableBody.appendChild(row);
+    });
+
+    document.querySelectorAll('.exit-device-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        hideDeviceListModal();
+        showConfirmExitModal(this.dataset.id, this.dataset.name, this.dataset.inventory);
+      });
+    });
+  }
+  // 处理出库记录 (添加新记录)
+  function processExitRecord() {
+    // 获取设备ID和出库数量
+    const deviceId = document.getElementById('confirmDeviceId').value;
+    const exitQuantity = document.getElementById('exitQuantity').value;
+
+    const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+
+    // 关键修正：确认出库时，我们检查并使用 tableName (设备表名)，而不是 chukuTableName
+    if (!currentLibrary || !currentLibrary.tableName) {
+      showAlert('仓库的设备表信息无效，无法完成出库操作。'); // 更新了提示信息，使其更准确
+      return;
+    }
+
+    // 使用正确的设备表名构建API URL
+    const apiUrl = `${API_BASE_URL}/api/add_out_record?table_name=${currentLibrary.tableName}&device_id=${deviceId}&chuku_unm=${exitQuantity}`;
+    console.log('添加出库记录API请求URL:', apiUrl);
+
+    showAlert('正在处理出库请求...');
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('出库成功: ' + data.message);
+          hideConfirmExitModal();
+          loadExitRecords(); // 成功后重新加载列表
+        } else {
+          showAlert('出库失败: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        showAlert('处理出库请求时发生错误: ' + error.message);
+      });
+  }
+  // 初始化动态信息横幅
+  function initDynamicBanner() {
+    const container = document.getElementById('dynamicTextContainer');
+    if (!container) return;
+
+    const messages = [
+      { icon: 'fa-cogs', text: '系统正在进行例行自检...' },
+      { icon: 'fa-truck', text: '新到货：智能门阀 x10 已成功入库。' },
+      { icon: 'fa-check-circle', text: '所有设备状态通讯正常。' },
+      { icon: 'fa-warning', text: '库存警报: "生命体征探测器" 数量紧张。' },
+      { icon: 'fa-user-secret', text: '管理员 Admin, 今日已处理 3 条出库请求。' }
+    ];
+    let currentIndex = 0;
+
+    function showNextMessage() {
+      container.innerHTML = '';
+      const item = document.createElement('div');
+      item.className = 'dynamic-text-item flex items-center';
+      const message = messages[currentIndex];
+      item.innerHTML = `<i class="fa ${message.icon} text-primary mr-3 text-lg"></i><span>${message.text}</span>`;
+      container.appendChild(item);
+      currentIndex = (currentIndex + 1) % messages.length;
+    }
+    showNextMessage();
+    setInterval(showNextMessage, 4000);
+  }
+
+  // 初始化设备搜索功能
+  function initDeviceSearch() {
+    const searchInput = document.getElementById('deviceSearchInput');
+    const searchIcon = document.getElementById('deviceSearchIcon');
+
+    if (searchInput && searchIcon) {
+      const triggerSearch = () => {
+        const searchTerm = searchInput.value.trim();
+        const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+        if (!currentLibrary || !currentLibrary.tableName) {
+          showAlert('无法执行搜索：未选择有效仓库。');
+          return;
+        }
+        if (!searchTerm) {
+          loadLibraryDevices(currentLibraryId);
+          return;
+        }
+        document.getElementById('deviceLoadingState').classList.remove('hidden');
+        document.getElementById('deviceTableContent').classList.add('hidden');
+        document.getElementById('deviceEmptyState').classList.add('hidden');
+
+        const apiUrl = `${API_BASE_URL}/api/search_devices?table_name=${currentLibrary.tableName}&devices_name=${encodeURIComponent(searchTerm)}`;
+        fetch(apiUrl)
+          .then(response => response.json())
+          .then(data => {
+            document.getElementById('deviceLoadingState').classList.add('hidden');
+            if (data.success && data.data) {
+              const nameToCountMap = new Map([[data.devices_name, data.device_count || 0]]);
+              const devices = data.data.map(device => {
+                const totalCount = nameToCountMap.get(device.devices_name) || 0;
+                let calculatedStatus = totalCount > 6 ? '充盈' : (totalCount >= 3 ? '饱和' : '紧张');
+                return { id: device.id, name: device.devices_name, deviceId: device.device_id, entryTime: device.warehouse_entry_time, inventory: parseInt(device.inventory), status: device.status, totalCount, calculatedStatus };
+              });
+              renderDevicesTable(devices);
+              if (devices.length === 0) {
+                document.getElementById('deviceEmptyState').classList.remove('hidden');
+              } else {
+                document.getElementById('deviceTableContent').classList.remove('hidden');
+              }
+            } else {
+              showAlert(`搜索失败: ${data.message || '未找到设备'}`);
+              document.getElementById('deviceEmptyState').classList.remove('hidden');
+            }
+          })
+          .catch(error => {
+            console.error('搜索API请求错误:', error);
+            showAlert('搜索设备时发生网络错误');
+            document.getElementById('deviceLoadingState').classList.add('hidden');
+            document.getElementById('deviceEmptyState').classList.remove('hidden');
+          });
+      };
+      searchIcon.addEventListener('click', triggerSearch);
+      searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') triggerSearch();
+      });
+    }
+  }
+
+  // 初始化添加设备模态框
+  function initAddDeviceModal() {
+    const addBtn = document.getElementById('addDeviceBtn');
+    const modalContainer = document.getElementById('addDeviceModalContainer');
+    const modalContent = document.getElementById('addDeviceModalContent');
+    const closeBtn = document.getElementById('closeAddDeviceModal');
+    const cancelBtn = document.getElementById('cancelAddDeviceModal');
+    const submitBtn = document.getElementById('submitAddDevice');
+    const form = document.getElementById('addDeviceForm');
+
+    function showModal() {
+      const btnRect = addBtn.getBoundingClientRect();
+      modalContent.style.setProperty('--tw-origin-x', `${btnRect.left + btnRect.width / 2}px`);
+      modalContent.style.setProperty('--tw-origin-y', `${btnRect.top + btnRect.height / 2}px`);
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById('newDeviceEntryTime').value = now.toISOString().slice(0, 16);
+      modalContainer.classList.remove('hidden');
+      modalContainer.classList.add('flex');
+      setTimeout(() => {
+        modalContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modalContent.classList.remove('scale-0', 'opacity-0');
+      }, 10);
+    }
+
+    function hideModal() {
+      modalContainer.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+      modalContent.classList.add('scale-0', 'opacity-0');
+      setTimeout(() => {
+        modalContainer.classList.add('hidden');
+        modalContainer.classList.remove('flex');
+        form.reset();
+      }, 300);
+    }
+
+    addBtn.addEventListener('click', showModal);
+    closeBtn.addEventListener('click', hideModal);
+    cancelBtn.addEventListener('click', hideModal);
+    modalContainer.addEventListener('click', (e) => {
+      if (e.target === modalContainer) hideModal();
+    });
+
+    submitBtn.addEventListener('click', function() {
+      const deviceName = document.getElementById('newDeviceName').value.trim();
+      const deviceId = document.getElementById('newDeviceId').value.trim();
+      const entryTimeValue = document.getElementById('newDeviceEntryTime').value;
+      const particulars = document.getElementById('newDeviceParticulars').value.trim();
+      const operatorName = localStorage.getItem('name_cha') || localStorage.getItem('username') || '未知用户';
+
+      if (!deviceName || !deviceId) {
+        showAlert('设备名称和设备编号不能为空！');
+        return;
+      }
+
+      const formattedTime = entryTimeValue.replace('T', ' ') + ':00';
+      const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+      if (!currentLibrary) {
+        showAlert('未找到当前仓库信息。');
+        return;
+      }
+
+      const requestData = {
+        "device_id": deviceId,
+        "devices_name": deviceName,
+        "warehouse_entry_time": formattedTime,
+        "particulars": particulars,
+        "operator": operatorName,
+        "warehouse_id": currentLibraryId,
+        "warehouse_db": "my_database"
+      };
+
+      const apiUrl = `${API_BASE_URL}/api/add_devices?table_name=${currentLibrary.tableName}`;
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            showAlert('设备添加成功！');
+            hideModal();
+            loadLibraryDevices(currentLibraryId);
+          } else {
+            showAlert(`添加失败: ${data.message || '未知错误'}`);
+          }
+        })
+        .catch(error => {
+          console.error('添加设备API请求错误:', error);
+          showAlert('添加设备时发生网络错误。');
+        });
+    });
+  }
+
+  // 初始化打印功能
+  function initPrintFunctionality() {
+    document.getElementById('printEntryRecordsBtn')?.addEventListener('click', () => window.print());
+  }
+
+  // 初始化入库记录搜索功能
+  function initEntryRecordSearch() {
+    const searchBtn = document.getElementById('entrySearchBtn');
+    const resetBtn = document.getElementById('entryResetBtn');
+    const deviceNameInput = document.getElementById('entryDeviceNameInput');
+    const startDateInput = document.getElementById('entryStartDateInput');
+    const endDateInput = document.getElementById('entryEndDateInput');
+
+    searchBtn?.addEventListener('click', () => {
+      const deviceName = deviceNameInput.value.trim();
+      const startDate = startDateInput.value;
+      const endDate = endDateInput.value;
+      const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+      if (!currentLibrary || !currentLibrary.tableName) {
+        showAlert('无法执行搜索：未选择有效仓库。');
+        return;
+      }
+      const tableName = currentLibrary.tableName;
+      let apiUrl = `${API_BASE_URL}/api/search_warehouse?table_name=${tableName}`;
+      if (deviceName) apiUrl += `&devices_name=${encodeURIComponent(deviceName)}`;
+      if (startDate) apiUrl += `&start_date=${startDate}`;
+      if (endDate) apiUrl += `&end_date=${endDate}`;
+
+      showAlert('正在搜索入库记录...');
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            renderEntryRecordsTable(data.data);
+            document.getElementById('entryTotalCount').textContent = data.count;
+            document.getElementById('entryStartIndex').textContent = data.data.length > 0 ? 1 : 0;
+            document.getElementById('entryEndIndex').textContent = data.data.length;
+            showAlert(`搜索完成，找到 ${data.count} 条记录。`);
+          } else {
+            showAlert(`搜索失败: ${data.message || '未知错误'}`);
+            document.getElementById('entryRecordsTableBody').innerHTML = '';
+          }
+        })
+        .catch(error => {
+          console.error('搜索API请求错误:', error);
+          showAlert('搜索时发生网络错误。');
+        });
+    });
+
+    resetBtn?.addEventListener('click', () => {
+      deviceNameInput.value = '';
+      startDateInput.value = '';
+      endDateInput.value = '';
+      loadEntryRecords();
+    });
+  }
+
+  // 渲染仓库列表
+  function renderLibrariesList() {
+    const librariesList = document.getElementById('librariesList');
+    librariesList.innerHTML = '';
+    librariesData.forEach(library => {
+      const isActive = library.id === currentLibraryId;
+      const libraryItem = document.createElement('div');
+      libraryItem.className = `sidebar-item relative bg-white border border-gray-200 rounded-lg p-3 cursor-pointer transition-all duration-300 ${isActive ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`;
+      libraryItem.setAttribute('data-id', library.id);
+      libraryItem.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="font-medium text-gray-800 text-sm ${isActive ? 'text-primary' : ''}">${library.name}</h3>
+              <p class="text-xs text-gray-500 mt-1">${library.location}</p>
+              <p class="text-xs text-gray-500 mt-1">设备: ${library.deviceCount} 台</p>
+            </div>
+            <div class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">${library.manager}</div>
+          </div>
+          ${isActive ? '<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg"></div>' : ''}
+        `;
+      libraryItem.addEventListener('click', function() {
+        const libraryId = parseInt(this.getAttribute('data-id'));
+        if (libraryId !== currentLibraryId) {
+          currentLibraryId = libraryId;
+          renderLibrariesList();
+          const activeModule = document.querySelector('.tab-pane:not(.hidden)');
+          if (activeModule) showModule(activeModule.id);
+          const currentLibrary = librariesData.find(l => l.id === libraryId);
+          document.getElementById('currentLibraryName').textContent = currentLibrary.name;
+          document.getElementById('currentLibraryCount').textContent = currentLibrary.deviceCount;
+          showAlert(`已切换到 ${currentLibrary.name}`);
+        }
+      });
+      librariesList.appendChild(libraryItem);
+    });
+  }
+
+  // 加载指定仓库的设备数据
+  function loadLibraryDevices(libraryId) {
+    document.getElementById('deviceLoadingState').classList.remove('hidden');
+    document.getElementById('deviceTableContent').classList.add('hidden');
+    document.getElementById('deviceEmptyState').classList.add('hidden');
+
+    const currentLibrary = librariesData.find(l => l.id === libraryId);
+    if (!currentLibrary) {
+      showAlert('未找到选中的仓库');
+      return;
+    }
+    if (!currentLibrary.tableName) {
+      showAlert('仓库表名无效，请联系管理员');
+      document.getElementById('deviceLoadingState').classList.add('hidden');
+      document.getElementById('deviceEmptyState').classList.remove('hidden');
+      return;
+    }
+
+    fetch(`${API_BASE_URL}/api/devices?dbname=yzh_repertory01&table_name=${currentLibrary.tableName}&page=1&pageSize=10`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const nameToCountMap = new Map();
+          if (data.device_name_counts) {
+            data.device_name_counts.forEach(item => {
+              nameToCountMap.set(item.devices_name, item.count);
+            });
+          }
+          const devices = data.devices.map(device => {
+            const totalCount = nameToCountMap.get(device.devices_name) || 0;
+            const calculatedStatus = totalCount > 6 ? '充盈' : (totalCount >= 3 ? '饱和' : '紧张');
+            return {
+              id: device.id,
+              name: device.devices_name,
+              deviceId: device.device_id,
+              entryTime: device.warehouse_entry_time,
+              inventory: parseInt(device.inventory),
+              status: device.status,
+              totalCount,
+              calculatedStatus
+            };
+          });
+
+          if (!window.libraryDevices) window.libraryDevices = {};
+          window.libraryDevices[currentLibraryId] = devices;
+
+          renderDevicesTable(devices);
+          updateStatistics(devices);
+          updateCharts(devices);
+
+          document.getElementById('deviceLoadingState').classList.add('hidden');
+          if (devices.length === 0) {
+            document.getElementById('deviceEmptyState').classList.remove('hidden');
+          } else {
+            document.getElementById('deviceTableContent').classList.remove('hidden');
+          }
+        } else {
+          showAlert('获取设备数据失败');
+          document.getElementById('deviceLoadingState').classList.add('hidden');
+          document.getElementById('deviceEmptyState').classList.remove('hidden');
+        }
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        showAlert('获取设备数据时发生错误');
+        document.getElementById('deviceLoadingState').classList.add('hidden');
+        document.getElementById('deviceEmptyState').classList.remove('hidden');
+      });
+  }
+
+  // 加载入库记录数据
+  function loadEntryRecords() {
+    const entryTableContent = document.getElementById('entryTableContent');
+    const tableBody = document.getElementById('entryRecordsTableBody');
+    tableBody.innerHTML = '';
+    entryTableContent.classList.add('hidden');
+    showAlert('正在加载入库记录...');
+
+    const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+    if (!currentLibrary || !currentLibrary.tableName) {
+      showAlert('仓库信息无效，无法加载入库记录。');
+      return;
+    }
+
+    const apiUrl = `${API_BASE_URL}/api/warehouse_records?table_name=${currentLibrary.tableName}`;
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.records) {
+          renderEntryRecordsTable(data.records);
+          document.getElementById('entryTotalCount').textContent = data.count;
+          document.getElementById('entryStartIndex').textContent = data.records.length > 0 ? 1 : 0;
+          document.getElementById('entryEndIndex').textContent = data.records.length;
+          entryTableContent.classList.remove('hidden');
+          showAlert('入库记录加载成功！');
+        } else {
+          showAlert(`加载入库记录失败: ${data.message || '返回数据格式不正确'}`);
+        }
+      })
+      .catch(error => {
+        console.error('入库记录API请求错误:', error);
+        showAlert('加载入库记录时发生网络错误。');
+      });
+  }
+
+  // 加载出库记录数据
+  function loadExitRecords() {
+    // 显示加载状态
+    document.getElementById('exitTableContent').classList.add('hidden');
+    document.getElementById('exitLoadingState').classList.remove('hidden');
+    document.getElementById('exitEmptyState').classList.add('hidden');
+
+    // 找到当前仓库
+    const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+
+    // 安全检查：确保当前仓库对象有 tableName (设备表名) 属性
+    if (!currentLibrary || !currentLibrary.tableName) {
+      showAlert('仓库的设备表信息无效，无法加载关联的出库记录。');
+      document.getElementById('exitLoadingState').classList.add('hidden');
+      document.getElementById('exitEmptyState').classList.remove('hidden');
+      return;
+    }
+
+    // 重要修改：根据您的要求，现在使用设备表名(tableName)来获取出库记录
+    const apiUrl = `${API_BASE_URL}/api/out_records?table_name=${currentLibrary.tableName}`;
+    console.log('获取出库记录API请求URL:', apiUrl);
+
+    // 调用API
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('exitLoadingState').classList.add('hidden');
+
+        // 根据您提供的JSON，记录在 data.data.records 中
+        if (data.success && data.data && data.data.records) {
+          // 渲染出库记录表格
+          renderExitRecordsTable(data.data.records);
+
+          // 更新分页信息
+          document.getElementById('exitTotalCount').textContent = data.data.count;
+          document.getElementById('exitStartIndex').textContent = data.data.records.length > 0 ? 1 : 0;
+          document.getElementById('exitEndIndex').textContent = data.data.records.length;
+
+          // 显示表格内容
+          if (data.data.records.length === 0) {
+            document.getElementById('exitEmptyState').classList.remove('hidden');
+          } else {
+            document.getElementById('exitTableContent').classList.remove('hidden');
+          }
+        } else {
+          showAlert('获取出库记录失败: ' + (data.message || '返回数据格式不正确'));
+          document.getElementById('exitEmptyState').classList.remove('hidden');
+        }
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        showAlert('获取出库记录时发生错误: ' + error.message);
+        document.getElementById('exitLoadingState').classList.add('hidden');
+        document.getElementById('exitEmptyState').classList.remove('hidden');
+      });
+  }
+  // 渲染入库记录表格
+  function renderEntryRecordsTable(records) {
+    const tableBody = document.getElementById('entryRecordsTableBody');
+    tableBody.innerHTML = '';
+    if (!records || records.length === 0) {
+      document.getElementById('bannerTotalEntries').textContent = 0;
+      return;
+    }
+
+    const now = new Date();
+    const twentyFourHoursAgo = now.getTime() - (24 * 60 * 60 * 1000);
+    let newRecordCount = 0;
+    document.getElementById('bannerTotalEntries').textContent = records.length;
+    const bannerTextContainer = document.getElementById('entryDynamicTextContainer');
+
+    records.forEach((record) => {
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-gray-50 transition-colors duration-200';
+      const entryTime = new Date(record.warehouse_entry_time).getTime();
+      if (entryTime > twentyFourHoursAgo) {
+        row.classList.add('breathing-row');
+        row.style.animationDelay = `${newRecordCount * 0.4}s`;
+        newRecordCount++;
+      }
+      row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.id}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.devices_name || 'N/A'}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDateTime(record.warehouse_entry_time)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.operator || '未知'}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.particulars || '-'}</td>
+        `;
+      tableBody.appendChild(row);
+    });
+
+    if (newRecordCount > 0) {
+      bannerTextContainer.innerHTML = `<i class="fa fa-bell text-yellow-500 mr-3 text-lg animate-pulse"></i><span>今日有 ${newRecordCount} 条新入库记录！</span>`;
+    } else {
+      bannerTextContainer.innerHTML = `<i class="fa fa-check-circle text-secondary mr-3 text-lg"></i><span>今日暂无新入库记录</span>`;
+    }
+  }
+
+  // 渲染出库记录表格
+  function renderExitRecordsTable(records) {
+    const tableBody = document.getElementById('exitRecordsTableBody');
+    tableBody.innerHTML = '';
+    if (records.length === 0) return;
+    records.forEach((record, index) => {
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-gray-50 transition-colors duration-200 sidebar-item';
+      row.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.device_name}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDateTime(new Date().toISOString())}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.chuku_unm}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.operator}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.recipient}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${record.destination}</td>
+      `;
+      tableBody.appendChild(row);
+    });
+  }
+
+  // 渲染设备表格
+  function renderDevicesTable(devices) {
+    const tableBody = document.getElementById('devicesTableBody');
+    tableBody.innerHTML = '';
+    if (devices.length === 0) return;
+
+    const pageSize = parseInt(document.getElementById('pageSizeSelector').value) || 10;
+    const currentPage = parseInt(document.querySelector('#devicePaginationNumbers .text-primary')?.dataset.page) || 1;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, devices.length);
+    const paginatedDevices = devices.slice(startIndex, endIndex);
+
+    const statusStyles = {
+      '充盈': 'bg-blue-100 text-blue-800',
+      '饱和': 'bg-yellow-100 text-yellow-800',
+      '紧张': 'bg-red-100 text-red-800'
+    };
+
+    paginatedDevices.forEach((device, index) => {
+      const iconClass = deviceIcons[device.name] || 'fa-cube';
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-gray-50 transition-colors duration-200 sidebar-item';
+      row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${startIndex + index + 1}</td>
+          <td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center"><div class="device-icon bg-primary/10 rounded-full text-primary mr-3"><i class="fa ${iconClass}"></i></div><div><div class="text-sm font-medium text-gray-900">${device.name}</div></div></div></td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${device.deviceId || 'N/A'}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDateTime(device.entryTime)}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${device.totalCount}</td>
+          <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[device.calculatedStatus] || 'bg-gray-100 text-gray-800'}">${device.calculatedStatus}</span></td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button class="text-indigo-600 hover:text-indigo-900 mr-3 transition-colors edit-device-btn" data-id="${device.id}"><i class="fa fa-pencil mr-1"></i>编辑</button>
+            <button class="text-red-600 hover:text-red-900 transition-colors delete-device-btn" data-id="${device.id}"><i class="fa fa-trash mr-1"></i>删除</button>
+          </td>
+        `;
+      tableBody.appendChild(row);
+    });
+
+    document.getElementById('deviceStartIndex').textContent = devices.length > 0 ? startIndex + 1 : 0;
+    document.getElementById('deviceEndIndex').textContent = endIndex;
+    document.getElementById('deviceTotalCount').textContent = devices.length;
+
+    generatePagination('device', devices.length, pageSize, currentPage);
+
+    document.getElementById('devicePrevPage').disabled = currentPage === 1;
+    document.getElementById('deviceNextPage').disabled = endIndex >= devices.length;
+  }
+
+  // 生成分页
+  function generatePagination(prefix, totalItems, pageSize, currentPage) {
+    const paginationNumbers = document.getElementById(`${prefix}PaginationNumbers`);
+    if (!paginationNumbers) return;
+    paginationNumbers.innerHTML = '';
+
+    const totalPages = Math.ceil(totalItems / pageSize);
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    const addPageNumber = (pageNum) => {
+      const pageButton = document.createElement('button');
+      pageButton.className = `px-3 py-1.5 border-t border-b border-gray-200 bg-white text-sm ${pageNum === currentPage ? 'text-primary font-medium border-primary' : 'text-gray-500 hover:text-primary'}`;
+      pageButton.textContent = pageNum;
+      pageButton.dataset.page = pageNum;
+      pageButton.addEventListener('click', () => renderDevicesTable(window.libraryDevices[currentLibraryId] || []));
+      paginationNumbers.appendChild(pageButton);
+    };
+
+    const addEllipsis = () => {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'px-3 py-1.5 border-t border-b border-gray-200 bg-white text-gray-500 text-sm';
+      ellipsis.textContent = '...';
+      paginationNumbers.appendChild(ellipsis);
+    };
+
+    if (startPage > 1) {
+      addPageNumber(1);
+      if (startPage > 2) addEllipsis();
+    }
+    for (let i = startPage; i <= endPage; i++) addPageNumber(i);
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) addEllipsis();
+      addPageNumber(totalPages);
+    }
+  }
+
+  // 初始化编辑设备模态框
+  function initEditDeviceModal() {
+    const modal = document.getElementById('editDeviceModal');
+    const modalContent = document.getElementById('editModalContent');
+    const closeModalBtn = document.getElementById('closeEditModal');
+    const cancelModalBtn = document.getElementById('cancelEditModal');
+    const submitModalBtn = document.getElementById('submitEditDevice');
+
+    document.body.addEventListener('click', function(e) {
+      if (e.target.closest('.edit-device-btn')) {
+        openEditModal(parseInt(e.target.closest('.edit-device-btn').dataset.id));
+      } else if (e.target.closest('.delete-device-btn')) {
+        deleteDevice(parseInt(e.target.closest('.delete-device-btn').dataset.id));
+      }
+    });
+
+    function openEditModal(deviceId) {
+      const devices = window.libraryDevices[currentLibraryId] || [];
+      const device = devices.find(d => d.id === deviceId);
+      if (!device) {
+        showAlert('未找到该设备信息');
+        return;
+      }
+      document.getElementById('editDeviceId').value = device.id;
+      document.getElementById('editDeviceName').value = device.name;
+      document.getElementById('editDeviceIdentifier').value = device.deviceId;
+      document.getElementById('editProductUnm').value = device.productUnm;
+      const date = new Date(device.entryTime);
+      document.getElementById('editDeviceEntryTime').value = date.toISOString().slice(0, 16);
+      document.getElementById('editDeviceInventory').value = device.totalCount;
+      document.getElementById('editDeviceStatus').value = device.calculatedStatus;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+
+    function hideModal() {
+      modalContent.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    closeModalBtn.addEventListener('click', hideModal);
+    cancelModalBtn.addEventListener('click', hideModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) hideModal();
+    });
+
+    submitModalBtn.addEventListener('click', function() {
+      const deviceId = parseInt(document.getElementById('editDeviceId').value);
+      const deviceName = document.getElementById('editDeviceName').value.trim();
+      const deviceEntryTime = document.getElementById('editDeviceEntryTime').value;
+      const deviceIdentifier = document.getElementById('editDeviceIdentifier').value;
+
+      if (!deviceName) {
+        showAlert('请输入设备名称');
+        return;
+      }
+      const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+      if (!currentLibrary || !currentLibrary.tableName) {
+        showAlert('仓库信息无效');
+        return;
+      }
+      const requestData = { "devices_name": deviceName, "warehouse_entry_time": `${deviceEntryTime}:00`, "device_id": deviceIdentifier };
+      const apiUrl = `${API_BASE_URL}/api/update_device/${deviceId}?dbname=yzh_repertory01&table_name=${currentLibrary.tableName}`;
+
+      fetch(apiUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            loadLibraryDevices(currentLibraryId);
+            hideModal();
+            showAlert('设备信息已更新');
+          } else {
+            showAlert('更新设备失败: ' + data.message);
+          }
+        })
+        .catch(error => {
+          console.error('API请求错误:', error);
+          showAlert('更新设备时发生错误: ' + error.message);
+        });
+    });
+  }
+
+  // 删除设备
+  function deleteDevice(deviceId) {
+    if (confirm('确定要删除该设备吗？此操作不可撤销。')) {
+      const currentLibrary = librariesData.find(l => l.id === currentLibraryId);
+      if (!currentLibrary || !currentLibrary.tableName) {
+        showAlert('仓库信息无效');
+        return;
+      }
+      const apiUrl = `${API_BASE_URL}/api/del_devices/${deviceId}?dbname=yzh_repertory01&table_name=${currentLibrary.tableName}`;
+      fetch(apiUrl, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            loadLibraryDevices(currentLibraryId); // 重新加载数据以刷新列表和统计
+            showAlert('设备已成功删除');
+          } else {
+            showAlert('删除设备失败: ' + data.message);
+          }
+        })
+        .catch(error => {
+          console.error('API请求错误:', error);
+          showAlert('删除设备时发生错误');
+        });
+    }
+  }
+
+  // 初始化分页事件
+  function initPaginationEvents() {
+    document.getElementById('devicePrevPage').addEventListener('click', () => {
+      const currentPage = parseInt(document.querySelector('#devicePaginationNumbers .text-primary')?.dataset.page) || 1;
+      if (currentPage > 1) {
+        document.querySelector(`#devicePaginationNumbers button[data-page='${currentPage - 1}']`).click();
+      }
+    });
+    document.getElementById('deviceNextPage').addEventListener('click', () => {
+      const currentPage = parseInt(document.querySelector('#devicePaginationNumbers .text-primary')?.dataset.page) || 1;
+      const totalItems = (window.libraryDevices && window.libraryDevices[currentLibraryId]?.length) || 0;
+      const pageSize = parseInt(document.getElementById('pageSizeSelector').value) || 10;
+      if (currentPage < Math.ceil(totalItems / pageSize)) {
+        document.querySelector(`#devicePaginationNumbers button[data-page='${currentPage + 1}']`).click();
+      }
+    });
+    document.getElementById('pageSizeSelector').addEventListener('change', () => {
+      if (window.libraryDevices && window.libraryDevices[currentLibraryId]) {
+        renderDevicesTable(window.libraryDevices[currentLibraryId]);
+      }
+    });
+  }
+
+  // 更新统计数据
+  function updateStatistics(devices) {
+    document.getElementById('bannerTotalDevices').textContent = devices.length;
+  }
+
+  // 初始化导航切换
+  function initNavigation() {
+    const setupNav = (selector, activeClass) => {
+      const links = document.querySelectorAll(selector);
+      links.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          links.forEach(l => l.classList.remove(...activeClass));
+          this.classList.add(...activeClass);
+          const target = this.getAttribute('data-target');
+          showModule(target);
+          if (selector.includes('mobile')) document.getElementById('mobileMenu').classList.add('hidden');
+        });
+      });
+      if (links.length > 0) links[0].classList.add(...activeClass);
+    };
+    setupNav('#navTabs a', ['active', 'text-primary']);
+    setupNav('#mobileNavTabs a', ['text-primary']);
+    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+      document.getElementById('mobileMenu').classList.toggle('hidden');
+    });
+  }
+
+  // 显示指定模块
+  function showModule(moduleName) {
+    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden'));
+    document.getElementById(moduleName)?.classList.remove('hidden');
+
+    switch (moduleName) {
+      case 'deviceManagement':
+      case 'statistics':
+        if (window.libraryDevices && window.libraryDevices[currentLibraryId]) {
+          updateCharts(window.libraryDevices[currentLibraryId]);
+        } else {
+          loadLibraryDevices(currentLibraryId);
+        }
+        break;
+      case 'exitRecord': loadExitRecords(); break;
+      case 'entryRecord': loadEntryRecords(); break;
+    }
+  }
+
+  // 初始化图表
+  function initCharts() {
+    const chartOptions = {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, grid: { drawBorder: false } }, x: { grid: { display: false } } },
+      plugins: { legend: { display: false } }
+    };
+    window.inventoryChart = new Chart(document.getElementById('inventoryChart'), { type: 'bar', data: { labels: [], datasets: [{ label: '库存数量', data: [], backgroundColor: 'rgba(22, 93, 255, 0.7)', borderWidth: 1, borderRadius: 6 }] }, options: chartOptions });
+    window.trendChart = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: ['1月', '2月', '3月', '4月', '5月', '6月'], datasets: [{ label: '入库数量', data: [0,0,0,0,0,0], borderColor: 'rgba(22, 93, 255, 1)', backgroundColor: 'rgba(22, 93, 255, 0.1)', tension: 0.4, fill: true }, { label: '出库数量', data: [0,0,0,0,0,0], borderColor: 'rgba(12, 189, 155, 1)', backgroundColor: 'rgba(12, 189, 155, 0.1)', tension: 0.4, fill: true }] }, options: { ...chartOptions, plugins: { legend: { display: true } } } });
+    window.statusChart = new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['正常', '待检修', '已损坏', '已借出'], datasets: [{ data: [0,0,0,0], backgroundColor: ['rgba(12, 189, 155, 0.7)', 'rgba(250, 173, 20, 0.7)', 'rgba(245, 106, 106, 0.7)', 'rgba(22, 93, 255, 0.7)'], borderWidth: 0, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '65%' } });
+  }
+
+  // 更新图表数据
+  function updateCharts(devices) {
+    if (!window.inventoryChart || !window.trendChart || !window.statusChart || !devices) return;
+    const deviceNames = [...new Set(devices.map(d => d.name))];
+    const deviceCounts = deviceNames.map(name => devices.find(d => d.name === name).inventory);
+    window.inventoryChart.data.labels = deviceNames;
+    window.inventoryChart.data.datasets[0].data = deviceCounts;
+    window.inventoryChart.update();
+
+    const statusCounts = { '正常': 0, '待检修': 0, '已损坏': 0, '已借出': 0 };
+    devices.forEach(d => { if (d.status in statusCounts) statusCounts[d.status]++; });
+    window.statusChart.data.datasets[0].data = Object.values(statusCounts);
+    window.statusChart.update();
+  }
+
+  // 初始化添加仓库模态框
+  function initAddLibraryModal() {
+    const addLibraryBtn = document.getElementById('addLibraryBtn');
+    const modal = document.getElementById('addLibraryModal');
+    const modalContent = document.getElementById('modalContent');
+    const closeModal = document.getElementById('closeLibraryModal');
+    const cancelModal = document.getElementById('cancelLibraryModal');
+    const submitModal = document.getElementById('submitLibrary');
+
+    if (!modal || !modalContent || !closeModal || !cancelModal || !submitModal) {
+      console.error('找不到模态框相关元素');
+      return;
+    }
+
+    function hideModal() {
+      modalContent.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    addLibraryBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 10);
+    });
+
+    closeModal.addEventListener('click', hideModal);
+    cancelModal.addEventListener('click', hideModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) hideModal();
+    });
+
+    submitModal.addEventListener('click', () => {
+      const libraryName = document.getElementById('libraryName').value.trim();
+      const libraryLocation = document.getElementById('libraryLocation').value.trim();
+      const libraryManager = document.getElementById('libraryManager').value.trim();
+      if (!libraryName) {
+        alert('请输入仓库名称');
+        return;
+      }
+
+      const warehouseName = 'test_warehouse' + (librariesData.length + 1);
+      const requestData = {
+        warehouse_name: warehouseName,
+        warehouse_data: [{ name: libraryName, location: libraryLocation || '未设置', manager: libraryManager || '未设置' }]
+      };
+
+      fetch(`${API_BASE_URL}/api/add_warehouse?dbname=yzh_kucun_name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const deviceTableName = data.created_tables?.devices_table?.table_name;
+            const chukuTableName = data.created_tables?.chuku_table?.table_name;
+
+            if (!deviceTableName || !chukuTableName) {
+              showAlert('添加仓库失败：后端响应中缺少必要的设备表名或出库表名。');
+              hideModal();
+              return;
+            }
+
+            const newId = librariesData.length > 0 ? Math.max(...librariesData.map(l => l.id)) + 1 : 1;
+            librariesData.push({
+              id: newId, name: libraryName, location: libraryLocation || '未设置', manager: libraryManager || '未设置',
+              deviceCount: 0, tableName: deviceTableName, chukuTableName: chukuTableName
+            });
+
+            if (!window.libraryDevices) window.libraryDevices = {};
+            window.libraryDevices[newId] = [];
+
+            renderLibrariesList();
+            currentLibraryId = newId;
+
+            const currentLibrary = librariesData.find(l => l.id === newId);
+            document.getElementById('currentLibraryName').textContent = currentLibrary.name;
+            document.getElementById('currentLibraryCount').textContent = currentLibrary.deviceCount;
+
+            hideModal();
+            document.getElementById('addLibraryForm').reset();
+            showAlert(`成功添加新仓库: ${libraryName}`);
+          } else {
+            showAlert('添加仓库失败: ' + data.message);
+            hideModal();
+          }
+        })
+        .catch(error => {
+          console.error('API请求错误:', error);
+          showAlert('添加仓库时发生错误');
+          hideModal();
+        });
+    });
+  }
+
+  // 初始化滚动效果
+  function initScrollEffect() {
+    const header = document.querySelector('header');
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function () {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      if (scrollTop > 10) {
+        header.classList.add('shadow-md');
+      } else {
+        header.classList.remove('shadow-md');
+      }
+      lastScrollTop = scrollTop;
+    });
+  }
+
+
+  // ==========================================================
+  // 4. 总初始化入口函数 (init)
+  // ==========================================================
+  function init() {
+    initDynamicBanner();
+    initAddDeviceModal();
+    initNavigation();
+    initCharts();
+    initDeviceSearch();
+    initAddLibraryModal();
+    initEditDeviceModal();
+    initScrollEffect();
+    initPaginationEvents();
+    initAddExitRecord();
+    initSidebarScroll();
+    initPrintFunctionality();
+    initEntryRecordSearch();
+    loadLibrariesData(); // 将加载数据放在最后，确保所有事件监听器已准备好
+    showModule('statistics');
+  }
+
+
+  // ==========================================================
+  // 5. 页面加载事件监听 (放在脚本的最后)
+  // ==========================================================
+  document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
